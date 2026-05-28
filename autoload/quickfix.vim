@@ -47,13 +47,13 @@ function! quickfix#toggle_preview() abort
 	if empty(s:preview_line) | return | endif
 
 	" プレビューを開く前の全ての通常バッファを記憶
-	let s: normal_buflist= map(getbufinfo({'buflisted': 1}), 'v:val.bufnr')
+	let s:normal_buflist= map(getbufinfo({'buflisted': 1}), 'v:val.bufnr')
 	call filter(s:normal_buflist, 'filereadable(bufname(v:val)) || empty(getbufvar(v:val, "&buftype"))')
 
 	" ファイル履歴に残さずにプレビューウィンドウを水平分割の上側に開く
 	if exists('g:lock_oldfiles') | let g:lock_oldfiles = 1 | endif
 	let w = split(line, '|')
-	execute "leftabove pedit +" . w[0].' '. split(w[1], ' ')[0]
+	execute "leftabove pedit +" . w[1] . ' ' . w[0]
 	if exists('g:lock_oldfiles') | let g:lock_oldfiles = 0 | endif
 endfunction
 
@@ -61,7 +61,7 @@ endfunction
 " Quickfixの表皮/非表示
 "---------------------------------------------------------------
 function! quickfix#toggle_quickfix() abort
-	if g:switch_all_window == 0
+	if g:switch_all_window
 		let nr = winnr("$")
 		copen
 

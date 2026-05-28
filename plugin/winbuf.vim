@@ -17,7 +17,7 @@ nnoremap <silent> <Plug>(wb-prev-window)		:<C-U>call switch_window#switch_window
 nnoremap <silent> <Plug>(wb-toggle-terminal)	:<C-U>call terminal#toggle_terminal()
 tnoremap <silent> <Plug>(wb-toggle-terminal)	:<C-U> <C-\><C-n>:call terminal#toggle_terminal()
 tnoremap <silent> <Plug>(wb-rotate-terminal)	:<C-U> <C-\><C-n>:call terminal#rotate_terminal()
-nnoremap <silent> <Plug>(wb-toggle_preview)	:<C-U>call quickfix#toggle_preview()
+nnoremap <silent> <Plug>(wb-toggle-preview)		:<C-U>call quickfix#toggle_preview()
 nnoremap <silent> <Plug>(wb-toggle-quickfix)	:<C-U>call quickfix#toggle_quickfix()
 nnoremap <silent> <Plug>(wb-buffer-close)		:<C-U>call buffer#close()
 nnoremap <silent> <Plug>(wb-buffer-list)		:<C-U>call buffer#list()
