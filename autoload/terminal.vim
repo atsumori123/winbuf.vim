@@ -60,6 +60,16 @@ function! s:toggle_terminal_floating() abort
 endfunction
 
 "---------------------------------------------------------------
+" ップアップウィンドウクロース
+"---------------------------------------------------------------
+function! s:terminal_popup_close(job, status) abort
+	if s:pop_term_win != 0 && popup_getoptions(s:pop_term_win) != {}
+		call popup_close(s:pop_term_win)
+		let s:pop_term_win = 0
+	endif
+endfunction
+
+"---------------------------------------------------------------
 " vim用（ポップアップウィンドウ）
 "---------------------------------------------------------------
 function! s:toggle_terminal_popup() abort
@@ -78,16 +88,18 @@ function! s:toggle_terminal_popup() abort
 	else
 		" 初回起動、またはプロセスが終了していた場合は新しくターミナルを作る
 		" &shell を使うことで、現在環境の標準シェル（bash, " zsh等）を自動起動する
-		let buf = term_start([&shell], {'hidden': 1, 'term_finish': 'close', 'term_kill': 'kill'})
+		let buf = term_start([&shell], { 'hidden': 1, 'term_finish': 'close', 'term_kill': 'kill', 'exit_cb': function('s:terminal_popup_close'), })
 		let s:pop_term_buf = buf
 	endif
 
 	" ポップアップウィンドウを作成してターミナルバッファを表示
+	let width = &columns - 20
+	let height = &lines - 10
 	let s:pop_term_win = popup_create(buf, {
-		\ 'minwidth': &columns - 20,
-		\ 'minheight': &lines - 10,
-		\ 'maxwidth': &columns - 20,
-		\ 'maxheight': &lines - 10,
+		\ 'minwidth': width,
+		\ 'minheight': height,
+		\ 'maxwidth': width,
+		\ 'maxheight': height,
 		\ 'border': [],
 		\ 'borderhighlight': ['Comment'],
 		\ 'filter': 'TogglePopupTerminalFilter',
