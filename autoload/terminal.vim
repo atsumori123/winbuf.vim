@@ -50,10 +50,12 @@ function! s:toggle_terminal_floating() abort
 		call termopen(&shell)
 	endif
 
+	" フォーカスが外れたら自動で閉じる
+	autocmd WinLeave <buffer> ++once if win_id2win(s:pop_term_win) > 0 | call nvim_win_close(s:pop_term_win, 1) | let s:pop_term_win = 0 | endif
+
 	highlight link NormalFloat Normal
 	highlight link FloatBorder Normal
 
-"	call feedkeys("i", "n")
 	call feedkeys("i\<BS>\<BS>\<BS>", "n")
 endfunction
 
@@ -92,7 +94,7 @@ function! s:toggle_terminal_popup() abort
 		\ })
 
 	if continue
-    	call feedkeys("i", "n")
+		call feedkeys("i\<BS>\<BS>\<BS>", "n")
 	endif
 endfunction
 
