@@ -47,7 +47,10 @@ function! s:toggle_terminal_floating() abort
         let s:pop_term_win = nvim_open_win(s:pop_term_buf, v:true, opts)
 
 		" ウィンドウが開いた状態（アクティブ）でターミナルを起動
-		call termopen(&shell)
+		let opts = {
+			\ 'cwd': empty(expand("%:h")) ? getcwd() : expand("%:p:h")
+			\ }
+		call termopen(g:winbuf_shell_type, opts)
 	endif
 
 	" フォーカスが外れたら自動で閉じる
@@ -83,19 +86,24 @@ function! s:toggle_terminal_popup() abort
 	" 過去に作ったバッファが存在し、かつ有効な場合はそれを再利用する（前回の続き）
 	let continue = 0
 	if s:pop_term_buf != 0 && bufexists(s:pop_term_buf)
-		let buf = s:pop_term_buf
 		let continue = 1
 	else
 		" 初回起動、またはプロセスが終了していた場合は新しくターミナルを作る
 		" &shell を使うことで、現在環境の標準シェル（bash, " zsh等）を自動起動する
-		let buf = term_start([&shell], { 'hidden': 1, 'term_finish': 'close', 'term_kill': 'kill', 'exit_cb': function('s:terminal_popup_close'), })
-		let s:pop_term_buf = buf
+		let opts = {
+			\ 'hidden': 1,
+			\ 'term_finish': 'close',
+			\ 'term_kill': 'kill',
+			\ 'exit_cb': function('s:terminal_popup_close'),
+			\ 'cwd': empty(expand("%:h")) ? getcwd() : expand("%:p:h")
+			\ }
+		let s:pop_term_buf = term_start([g:winbuf_shell_type], opts)
 	endif
 
 	" ポップアップウィンドウを作成してターミナルバッファを表示
 	let width = &columns - 20
 	let height = &lines - 10
-	let s:pop_term_win = popup_create(buf, {
+	let s:pop_term_win = popup_create(s:pop_term_buf, {
 		\ 'minwidth': width,
 		\ 'minheight': height,
 		\ 'maxwidth': width,

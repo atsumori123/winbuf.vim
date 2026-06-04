@@ -6,7 +6,7 @@ set cpoptions&vim
 "-------------------------------------------------------
 function! switch_window#switch_window(direction) abort
 	" 特殊バッファも全てのウィンドウが移動対象の場合
-	if g:switch_all_window
+	if g:winbuf_switch_all_window
 		if a:direction > 0 | wincmd w | else | wincmd W | endif
 		return
 	endif

@@ -61,7 +61,7 @@ endfunction
 " Quickfixの表皮/非表示
 "---------------------------------------------------------------
 function! quickfix#toggle_quickfix() abort
-	if g:switch_all_window
+	if g:winbuf_switch_all_window
 		let nr = winnr("$")
 		copen
 
