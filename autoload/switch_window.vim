@@ -29,7 +29,9 @@ function! switch_window#switch_window(direction) abort
 
 		" 特殊バッファかどうかを判定（buftypeが空＝通常バッファ）
 		" もし移動先が通常バッファ、あるいは一周回って戻ってきたらループ終了
-		if getbufvar(winbufnr(current_win), '&buftype') ==# '' || current_win == start_win
+		let bt = getbufvar(winbufnr(current_win), '&buftype')
+		let bl = buflisted(winbufnr(current_win))
+		if bt ==# '' || bl || current_win == start_win
 			execute current_win . 'wincmd w'
 			break
 		endif
