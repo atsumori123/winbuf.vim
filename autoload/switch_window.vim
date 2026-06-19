@@ -31,12 +31,36 @@ function! switch_window#switch_window(direction) abort
 		" もし移動先が通常バッファ、あるいは一周回って戻ってきたらループ終了
 		let bt = getbufvar(winbufnr(current_win), '&buftype')
 		let bl = buflisted(winbufnr(current_win))
-		if bt ==# '' || bl || current_win == start_win
+		if (bt ==# '' && bl) || current_win == start_win
 			execute current_win . 'wincmd w'
 			break
 		endif
 	endwhile
 endfunction
 
+"-------------------------------------------------------
+" 特殊バッファのウィンドウに切り替える関数
+"-------------------------------------------------------
+function! switch_window#switch_special_window() abort
+	" ウィンドウが1つしかない場合は何もしない
+	if winnr('$') == 1 | return | endif
+
+	let start_win = winnr()
+	let current_win = start_win
+	let total_win = winnr('$')
+
+	while 1
+		" 正順: 1 -> 2 -> 3 -> 1
+		let current_win = (current_win % winnr('$')) + 1
+
+		" 特殊バッファかどうかを判定（buftypeが空＝通常バッファ）
+		" もし移動先が特殊バッファ、あるいは一周回って戻ってきたらループ終了
+		let bt = getbufvar(winbufnr(current_win), '&buftype')
+		if bt !=# '' || current_win == start_win
+			execute current_win . 'wincmd w'
+			break
+		endif
+	endwhile
+endfunction
 let &cpoptions = s:save_cpo
 unlet s:save_cpo

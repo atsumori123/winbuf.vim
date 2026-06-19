@@ -24,7 +24,7 @@ function! resize_window#resize_window() abort
 	let is_width_fixed		= getwinvar(0, '&winfixwidth')
 	let is_height_fixed		= getwinvar(0, '&winfixheight')
 
-	echohl String | echo "Window resizing... (Expand with H/J/K/L, Exit with <ESC>)" | echohl None
+	echohl String | echo "Window resizing... (Resize:H/J/K/L, Exit:<ESC>/<CR>/q)" | echohl None
 
 	let exit_flag = 0
 	while !exit_flag
@@ -100,7 +100,7 @@ function! resize_window#resize_window() abort
 			endif
 
 		" --- ESC キー: 終了 ---
-		elseif char == "\<ESC>"
+		elseif char == "\<ESC>" || char == "\<CR>" || char ==# 'q'
 			let exit_flag = 1
 
 		endif
