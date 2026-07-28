@@ -1,10 +1,10 @@
-let s:save_cpo = &cpoptions
-set cpoptions&vim
-
 if exists('g:loaded_switch')
 	finish
 endif
 let g:loaded_switch = 1
+
+let s:save_cpo = &cpoptions
+set cpoptions&vim
 
 if !exists('g:winbuf_switch_all_window')
 	let g:winbuf_switch_all_window = 0
@@ -25,6 +25,10 @@ nnoremap <silent> <Plug>(wb-toggle-preview)		:<C-U>call quickfix#toggle_preview(
 nnoremap <silent> <Plug>(wb-toggle-quickfix)	:<C-U>call quickfix#toggle_quickfix()
 nnoremap <silent> <Plug>(wb-buffer-close)		:<C-U>call buffer#close()
 nnoremap <silent> <Plug>(wb-buffer-list)		:<C-U>call buffer#list()
+
+if exists('g:winbuf_easymotion_enable') && g:winbuf_easymotion_enable
+	nnoremap <silent> <Plug>(wb-easymotion)			:<C-U>call easymotion#start()
+endif
 
 let &cpoptions = s:save_cpo
 unlet s:save_cpo
