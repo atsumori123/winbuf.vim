@@ -26,6 +26,13 @@ let s:current_filename = ""
 let s:TagList = []
 
 "-------------------------------------------------------
+" get_file_hash
+"-------------------------------------------------------
+function! s:get_file_hash(filename)
+	return "_".sha256(a:filename)
+endfunction
+
+"-------------------------------------------------------
 " is_registered
 "-------------------------------------------------------
 function! s:is_registered(file_hash)
@@ -293,16 +300,12 @@ endfunction
 " remove_buffer
 "-------------------------------------------------------
 function! s:remove_buffer(filename)
-	" Make sure a valid filename is supplied
 	if a:filename == ''
 		return
 	endif
 
-	" ファイルパスをハッシュ値に変換
-	let file_hash = "_".sha256(a:filename)
-
 	" 登録解除
-	call s:unregister_taglist(file_hash)
+	call s:unregister_taglist(s:get_file_hash(a:filename))
 endfunction
 
 "-------------------------------------------------------
@@ -337,7 +340,7 @@ function! s:init_window()
 	nnoremap <buffer> <silent> q :call <SID>close_cleanup(1)<CR>
 	nnoremap <buffer> <silent> <c-k> :call <SID>skip_cursor(-1)<CR>
 	nnoremap <buffer> <silent> <c-j> :call <SID>skip_cursor(1)<CR>
-"	nnoremap <buffer> <silent> d :call <SID>dump_taglist()<CR>
+	nnoremap <buffer> <silent> d :call <SID>dump_taglist()<CR>
 
 	" Define the taglist autocommands
 	augroup TagListAutoCmds
@@ -349,19 +352,21 @@ function! s:init_window()
 		autocmd BufUnload __Tag_List__ call s:close_cleanup(0)
 
 		" バッファに入ったときに発火-->taglistウィンドウをリフレッシュ
-		autocmd BufEnter * call timer_start(0, {-> execute('call s:refresh_bufenter()')})
+		autocmd BufEnter * call timer_start(0, {-> execute('call s:refresh_bufenter(0)')})
 
 		" バッファを削除したときに発火-->キャッシュを削除
 		autocmd BufDelete * call s:remove_buffer(expand('<afile>:p'))
+
+		autocmd BufWritePost * call s:refresh_bufenter(1)
 	augroup end
 endfunction
 
 "-------------------------------------------------------
-" refresh_taglist
+" load_taglist
 "-------------------------------------------------------
-function! s:refresh_taglist(filename, ftype)
+function! s:load_taglist(filename, ftype)
 	" ファイルパスをハッシュ値に変換
-	let file_hash = "_".sha256(a:filename)
+	let file_hash = s:get_file_hash(a:filename)
 
 	" キャッシュの有無をチェック
 	if !s:is_registered(file_hash)
@@ -390,7 +395,7 @@ endfunction
 "-------------------------------------------------------
 " refresh_bufenter
 "-------------------------------------------------------
-function! s:refresh_bufenter()
+function! s:refresh_bufenter(reload)
 	" ファイル名、ファイルタイプの取得
 	let filename	= fnamemodify(bufname('%'), ':p')
 	let ftype		= getbufvar('%', '&filetype')
@@ -405,8 +410,12 @@ function! s:refresh_bufenter()
 		return
 	endif
 
-	if s:current_filename == filename
-		return
+	if a:reload
+		call s:unregister_taglist(s:get_file_hash(filename))
+	else
+		if s:current_filename == filename
+			return
+		endif
 	endif
 
 	" Update the taglist window
@@ -424,7 +433,7 @@ function! s:refresh_bufenter()
 	endif
 
 	" Update the taglist window
-	call s:refresh_taglist(filename, ftype)
+	call s:load_taglist(filename, ftype)
 
 	" カレントタグをハイライトする
 	call s:highlight_tag(filename, cur_lnum, 0, 0)
@@ -612,7 +621,7 @@ function! taglist#open()
 	endif
 
 	" タグの表示
-	call s:refresh_taglist(filename, ftype)
+	call s:load_taglist(filename, ftype)
 
 	" カレントタグをハイライトする
 	call s:highlight_tag(filename, lnum, 1, 0)
