@@ -29,6 +29,9 @@ nnoremap <silent> <Plug>(wb-buffer-list)		:<C-U>call buffer#list()
 if exists('g:winbuf_easymotion_enable') && g:winbuf_easymotion_enable
 	nnoremap <silent> <Plug>(wb-easymotion)			:<C-U>call easymotion#start()
 endif
+if exists('g:winbuf_taglist_enable') && g:winbuf_taglist_enable
+	nnoremap <silent> <Plug>(wb-taglist)			:<C-U>call taglist#open()
+endif
 
 let &cpoptions = s:save_cpo
 unlet s:save_cpo
