@@ -7,21 +7,6 @@ if exists('g:winbuf_taglist_enable') && g:winbuf_taglist_enable
 let s:cpo_save = &cpo
 set cpo&vim
 
-" if !exists('loaded_taglist')
-"	  if !exists('*system')
-"		  echomsg 'Taglist: Vim system() built-in function is not available. ' .
-"					  \ 'Plugin is not loaded.'
-"		  let loaded_taglist = 'no'
-"		  let &cpo = s:cpo_save
-"		  finish
-"	  endif
-
-"	  " When the taglist buffer is created when loading a Vim session file,
-"	  " the taglist buffer needs to be initialized. The BufFilePost event
-"	  " is used to handle this case.
-"	  autocmd BufFilePost __Tag_List__ call s:Tlist_Vim_Session_Load()
-" endif
-
 let s:current_filename = ""
 let s:TagList = []
 
@@ -71,7 +56,7 @@ endfunction
 function! s:dump_taglist()
 	let vars = execute('echo s:')
 	let vars = substitute(vars, '[{}\n]', "", 'g')
-	echom vars
+	echo vars
 endfunction
 
 "-------------------------------------------------------
@@ -82,24 +67,39 @@ function! s:warning_msg(msg)
 endfunction
 
 "-------------------------------------------------------
-" exe_cmd_no_acmds
+" switch_window
 "-------------------------------------------------------
-function! s:exe_cmd_no_acmds(cmd)
+function! s:switch_window(target_winnum)
 	let old_eventignore = &eventignore
 	set eventignore=all
-	exe a:cmd
-	let &eventignore = old_eventignore
-endfunction
 
+	let org_winnum = winnr()
+	if org_winnum != a:target_winnum
+		exe a:target_winnum . 'wincmd w'
+	endif
+
+	let &eventignore = old_eventignore
+	return org_winnum
+endfunction
+ 
 "-------------------------------------------------------
 " is_skip_file
 "-------------------------------------------------------
-function! s:is_skip_file(filename, ftype)
+function! s:is_skip_file(filename, ftype, buftype)
 	" 以下に該当するファイルはスキップ対象
 	" - ファイル名なし
 	" - ファイルタイプなし
-	" - ReadOnly
-	return (a:filename == '' || a:ftype == '' || !filereadable(a:filename)) ? 1 : 0
+	" - 特殊バッファ
+	" - ファイルが存在しない
+	let skip = 0
+	if a:filename == '' ||
+	 \ a:ftype == ''	||
+	 \ a:buftype != ''	||
+	 \ !filereadable(a:filename)
+		let skip = 1
+	endif
+
+	return skip
 endfunction
 
 "-------------------------------------------------------
@@ -127,9 +127,9 @@ endfunction
 function! s:skip_cursor(direction) abort
 	let n = line(".") + a:direction
 	let len = line('$')
-	for i in range(1, len)
-		if n > len | let n = 1 | endif
-		if n < 1 | let n = len | endif
+	for i in range(2, len)
+		if n > len | let n = 2 | endif
+		if n < 2 | let n = len | endif
 		if getline(n) =~ '^[0-9a-zA-Z]'
 			call cursor([n, 1, 0, 1])
 			break
@@ -217,18 +217,18 @@ endfunction
 "-------------------------------------------------------
 " extract_tagtype
 "-------------------------------------------------------
-function! s:extract_tagtype(tag_line)
-	let start	= strridx(a:tag_line, '/;"' . "\t") + 4
-	let end		= strridx(a:tag_line, 'line:') - 1
-	return strpart(a:tag_line, start, end - start)
+function! s:extract_tagtype(tag)
+	let start	= strridx(a:tag, '/;"' . "\t") + 4
+	let end		= strridx(a:tag, 'line:') - 1
+	return strpart(a:tag, start, end - start)
 endfunction
 
 "-------------------------------------------------------
 " extract_linenumber
 "-------------------------------------------------------
-function! s:extract_linenumber(tag_line)
-	let start = strridx(a:tag_line, "\t" . "line:") + 6
-	return start == -1 ? -1 : matchstr(a:tag_line, '^.\{' . start . '\}\zs\d\+')
+function! s:extract_linenumber(tag)
+	let start = strridx(a:tag, "\t" . "line:") + 6
+	return start == -1 ? -1 : matchstr(a:tag, '^.\{' . start . '\}\zs\d\+')
 endfunction
 
 "---------------------------------------------------------------
@@ -239,14 +239,12 @@ function! s:exe_ctags(filename, ftype, file_hash)
 	let ctags_args = s:get_ftype_option(a:ftype)
 
 	" 未サポートのファイルタイプの場合は終了
-	if ctags_args == ""
-		return 0
-	endif
+	if ctags_args == "" | return 0 | endif
 
 	let cmd = ['ctags', '-f', '-', '--excmd=pattern', '--fields=nKs', '--sort=no']
 
 	" ファイルタイプを指定
-	call add(cmd, '--language-force=' . a:ftype)
+	call add(cmd, '--language-force=' . matchstr(ctags_args, '--\zs.\{-}\ze-'))
 
 	" ファイルタイプ固有の引数を指定
 	call add(cmd, ctags_args)
@@ -285,8 +283,9 @@ function! s:close_cleanup(close)
 
 	" Clear all the highlights
 	match none
+	silent! syntax clear TagListTagName
+	silent! syntax clear TagListnum
 	silent! syntax clear TagListTitle
-	silent! syntax clear TagListComment
 	silent! syntax clear TagListTagScope
 
 	call s:unregister_all_taglist()
@@ -316,14 +315,15 @@ function! s:init_window()
 	setlocal filetype=taglist
 
 	" ハイライト設定
-	syntax match TagListLnum '\[.*\]'
-	syntax match TagListTitle '^[^\ \->].*'
-	syntax match TagListTagScope  '\s\[.\{-\}\]$'
+	syntax match TagListLnum '\  \[.*\]'
+	syntax match TagListTitle  '^\./.*'
+"	syntax match TagListTitle '/^.*\..*$/'
+	syntax match TagListTagScope  '^[a-zA-Z].*'
 
 	" ハイライトの設定
 	highlight default link TagListTagName Search
 	highlight default link TagListLnum Comment
-	highlight default link TagListTitle String
+	highlight default link TagListTitle Title
 	highlight default link TagListTagScope Identifier
 
 	silent! setlocal buftype=nofile
@@ -346,7 +346,7 @@ function! s:init_window()
 	augroup TagListAutoCmds
 		autocmd!
 		" 無操作状態が続いたときに発火-->カレントタグをハイライト
-		autocmd CursorHold * silent call s:highlight_tag(fnamemodify(bufname('%'), ':p'), line('.'), 0, 1)
+		autocmd CursorHold * silent call s:highlight_current_tag(fnamemodify(bufname('%'), ':p'), line('.'), 0, 1)
 
 		" taglistウィンドウをアンロードしたときに発火-->taglistのクリーンアップ
 		autocmd BufUnload __Tag_List__ call s:close_cleanup(0)
@@ -372,12 +372,12 @@ function! s:load_taglist(filename, ftype)
 	if !s:is_registered(file_hash)
 		" キャッシュが無い場合はctagsを実行
 		if s:exe_ctags(a:filename, a:ftype, file_hash) == 0
-			return
+			return 0
 		endif
 	endif
 
 	" 表示形式に変換
-	let output = []
+	let output = ['./' . fnamemodify(a:filename, ':t')]
 	for key in keys(s:{file_hash})
 		let output += [key] + map(copy(s:{file_hash}[key]), '"  " . v:val') + [""]
 	endfor
@@ -390,6 +390,8 @@ function! s:load_taglist(filename, ftype)
 
 	" taglistのカレントファイルを更新
 	let s:current_filename = a:filename
+
+	return 1
 endfunction
 
 "-------------------------------------------------------
@@ -397,16 +399,14 @@ endfunction
 "-------------------------------------------------------
 function! s:refresh_bufenter(reload)
 	" ファイル名、ファイルタイプの取得
-	let filename	= fnamemodify(bufname('%'), ':p')
-	let ftype		= getbufvar('%', '&filetype')
-	let tlist_win	= bufwinnr("__Tag_List__")
-	let cur_lnum	= line('.')
+	let filename		= fnamemodify(bufname('%'), ':p')
+	let ftype			= getbufvar('%', '&filetype')
+	let buftype			= getbufvar('%', '&buftype')
+	let tlist_winnum	= bufwinnr("__Tag_List__")
+	let cur_lnum		= line('.')
 
-	" 以下に該当する場合はスキップ
-	" 特殊バッファの場合
-	" リスト対象外のファイルの場合
-	" TagListウィンドウが未オープンの場合
-	if &buftype != '' || s:is_skip_file(filename, ftype) || tlist_win == -1
+	" 対象外のファイル、またはTagListウィンドウが未オープンの場合はスキップ
+	if s:is_skip_file(filename, ftype, buftype) || tlist_winnum == -1
 		return
 	endif
 
@@ -423,25 +423,17 @@ function! s:refresh_bufenter(reload)
 	let old_lazyredraw = &lazyredraw
 	set nolazyredraw
 
-	" Save the current window number
-	let save_winnr = winnr()
-
 	" TagListウィンドウにジャンプ
-	let winnum = bufwinnr("__Tag_List__")
-	if winnum != -1 && winnr() != winnum
-		call s:exe_cmd_no_acmds(winnum . 'wincmd w')
-	endif
+	let save_winnum = s:switch_window(tlist_winnum)
 
 	" Update the taglist window
-	call s:load_taglist(filename, ftype)
-
-	" カレントタグをハイライトする
-	call s:highlight_tag(filename, cur_lnum, 0, 0)
+	if s:load_taglist(filename, ftype)
+		" カレントタグをハイライト
+		call s:highlight_current_tag(filename, cur_lnum, 0, 0)
+	endif
 
 	" Jump back to the original window
-	if save_winnr != winnr()
-		call s:exe_cmd_no_acmds(save_winnr . 'wincmd w')
-	endif
+	let _ = s:switch_window(save_winnum)
 
 	" Restore screen updates
 	let &lazyredraw = old_lazyredraw
@@ -461,9 +453,9 @@ function! s:highlight_current_line_tag()
 endfunction
 
 "-------------------------------------------------------
-" highlight_tag
+" highlight_current_tag
 "-------------------------------------------------------
-function! s:highlight_tag(filename, cur_lnum, center, autocmd)
+function! s:highlight_current_tag(filename, cur_lnum, center, autocmd)
 	" taglistのウィンドウ番号を取得
 	let winnum = bufwinnr("__Tag_List__")
 	if winnum == -1
@@ -472,17 +464,15 @@ function! s:highlight_tag(filename, cur_lnum, center, autocmd)
 	endif
 
 	" 現在のウィンドウ番号を退避
-	let org_winnr = winnr()
+	let save_winnum = winnr()
 
 	" フォーカスがtaglistウィンドウにある場合はスキップ
-	if a:autocmd && (winnum == org_winnr)
+	if a:autocmd && (winnum == save_winnum)
 		return
 	endif
 
 	" taglistのウィンドウにスイッチ
-	if org_winnr != winnum
-		exe winnum . 'wincmd w'
-	endif
+	let save_winnum = s:switch_window(winnum)
 
 	" {タグの行番号:バッファ内でのタグの位置}の辞書を作成
 	let lnum_dic = {}
@@ -508,6 +498,8 @@ function! s:highlight_tag(filename, cur_lnum, center, autocmd)
 	" カーソル位置と一番近いタグを探す
 	let lnum = -1
 	if a:cur_lnum < sorted_keys[0]
+		" Go back to the original window
+		let _ = s:switch_window(save_winnum)
 		return
 	elseif a:cur_lnum > sorted_keys[-1]
 		let lnum = lnum_dic[sorted_keys[-1]]
@@ -533,9 +525,7 @@ function! s:highlight_tag(filename, cur_lnum, center, autocmd)
 	call s:highlight_current_line_tag()
 
 	" Go back to the original window
-	if org_winnr != winnum
-		exe org_winnr . 'wincmd w'
-	endif
+	let _ = s:switch_window(save_winnum)
 endfunction
 
 "-------------------------------------------------------
@@ -551,6 +541,9 @@ function! s:jump_to_tag()
 
 	" [ ] の中にある数字だけを抽出する
 	let lnum = matchstr(line, '\[\zs\d\+\ze\]')
+	if empty(lnum)
+		return
+	endif
 
 	" 選択したタグをハイライト
 	call s:highlight_current_line_tag()
@@ -559,7 +552,7 @@ function! s:jump_to_tag()
 	let winnum = bufwinnr(s:current_filename)
 	if winnum != -1
 		" ウィンドウにスイッチ
-		exe winnum . 'wincmd w'
+		let _ = s:switch_window(winnum)
 		call cursor(lnum, 1)
 		normal! z.
 
@@ -569,7 +562,7 @@ function! s:jump_to_tag()
 		for w in range(1, winnr('$'))
 			if getwinvar(w, '&buftype') ==# ''
 				" 通常バッファを表示しているウィンドウにスイッチ
-				exe w . 'wincmd w'
+				let _ = s:switch_window(w)
 				exe "buffer" . bufnr(s:current_filename) 
 				call cursor(lnum, 1)
 				normal! z.
@@ -579,19 +572,6 @@ function! s:jump_to_tag()
 	endif
 endfunction
 
-" Tlist_Vim_Session_Load
-" Initialize the taglist window/buffer, which is created when loading
-" a Vim session file.
-function! s:Tlist_Vim_Session_Load()
-	" Initialize the taglist window
-	call s:init_window()
-
-	" Refresh the taglist window
-	setlocal modifiable
-	silent! %delete _
-	setlocal nomodifiable
-endfunction
-
 "-------------------------------------------------------
 " Tlist_Window_Open
 "-------------------------------------------------------
@@ -599,15 +579,14 @@ function! taglist#open()
 	" ファイル名、ファイルタイプ、行番号の取得
 	let filename	= fnamemodify(bufname('%'), ':p')
 	let ftype		= getbufvar('%', '&filetype')
+	let buftype		= getbufvar('%', '&buftype')
 	let lnum		= line('.')
 
 	" taglistのウィンドウ番号を取得
 	let winnum = bufwinnr("__Tag_List__")
 	if winnum != -1
 		" 既にウィンドウがある場合はそのウィンドウにスイッチ
-		if winnr() != winnum
-			exe winnum . 'wincmd w'
-		endif
+		let _ = s:switch_window(winnum)
 	else
 		" ウィンドウが無い場合は作成
 		exe 'silent! botright vertical 30 split __Tag_List__'
@@ -615,20 +594,21 @@ function! taglist#open()
 		call s:init_window()
 	endif
 
-	" 対象外のファイルの場合はスキップ
-	if s:is_skip_file(filename, ftype)
+	" 対象外のファイルはスキップ
+	if s:is_skip_file(filename, ftype, buftype)
 		return
 	endif
 
 	" タグの表示
-	call s:load_taglist(filename, ftype)
-
-	" カレントタグをハイライトする
-	call s:highlight_tag(filename, lnum, 1, 0)
+	if s:load_taglist(filename, ftype)
+		" カレントタグをハイライト
+		call s:highlight_current_tag(filename, lnum, 1, 0)
+	endif
 endfunction
 
 " restore 'cpo'
 let &cpo = s:cpo_save
 unlet s:cpo_save
 endif
+
 
