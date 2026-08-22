@@ -83,6 +83,42 @@ function! s:switch_window(target_winnum)
 endfunction
  
 "-------------------------------------------------------
+" switch_taglist
+"-------------------------------------------------------
+function! s:switch_taglist(direction)
+	let current_bufnr = bufnr(s:current_filename)
+
+	let i = index(g:stline_buffers, current_bufnr)
+	if i == -1
+		return
+	endif
+
+	for n in g:stline_buffers 
+		" 次のバッファ番号
+		let i += a:direction
+		let i = (i < 0 ? len(g:stline_buffers) - 1 : (i >= len(g:stline_buffers) ? 0 : i))
+		let next_bufnr = g:stline_buffers[i]
+
+		" ファイル名、ファイルタイプの取得
+		let filename		= fnamemodify(bufname(next_bufnr), ':p')
+		let ftype			= getbufvar(next_bufnr, '&filetype')
+		let buftype			= getbufvar(next_bufnr, '&buftype')
+
+		" タグリスト対象ファイルか
+		if s:is_skip_file(filename, ftype, buftype) == 0
+			break
+		endif
+	endfor
+
+	if s:current_filename == filename
+		return
+	endif
+
+	" Update the taglist window
+	call s:load_taglist(filename, ftype)
+endfunction
+
+"-------------------------------------------------------
 " is_skip_file
 "-------------------------------------------------------
 function! s:is_skip_file(filename, ftype, buftype)
@@ -122,6 +158,19 @@ function! s:run_background_job(cmd) abort
 endfunction
 
 "---------------------------------------------------------------
+" bg_cmd
+"---------------------------------------------------------------
+function! s:bg_cmd(command)
+	if exists('*ch_close_in')
+		let result = s:run_background_job(a:command)
+		return result[1] == 0 ? result[0]: []
+	else
+		let result = systemlist(join(a:command, ' '))
+		return v:shell_error == 0 ? result : []
+	endif
+endfunction
+
+"---------------------------------------------------------------
 " skip_cursor
 "---------------------------------------------------------------
 function! s:skip_cursor(direction) abort
@@ -136,19 +185,6 @@ function! s:skip_cursor(direction) abort
 		endif
 		let n += a:direction
 	endfor
-endfunction
-
-"---------------------------------------------------------------
-" bg_cmd
-"---------------------------------------------------------------
-function! s:bg_cmd(command)
-	if exists('*ch_close_in')
-		let result = s:run_background_job(a:command)
-		return result[1] == 0 ? result[0]: []
-	else
-		let result = systemlist(join(a:command, ' '))
-		return v:shell_error == 0 ? result : []
-	endif
 endfunction
 
 "-------------------------------------------------------
@@ -346,6 +382,10 @@ function! s:init_window()
 	nnoremap <buffer> <silent> <c-k> :call <SID>skip_cursor(-1)<CR>
 	nnoremap <buffer> <silent> <c-j> :call <SID>skip_cursor(1)<CR>
 	nnoremap <buffer> <silent> d :call <SID>dump_taglist()<CR>
+	if exists('g:stline_buffers')
+		nnoremap <buffer> <silent> <c-h> :call <SID>switch_taglist(-1)<CR>
+		nnoremap <buffer> <silent> <c-l> :call <SID>switch_taglist(1)<CR>
+	endif
 
 	" Define the taglist autocommands
 	augroup TagListAutoCmds
@@ -559,18 +599,17 @@ function! s:jump_to_tag()
 		" ウィンドウにスイッチ
 		let _ = s:switch_window(winnum)
 		call cursor(lnum, 1)
-		normal! z.
+		normal! zt
 
 	elseif buflisted(s:current_filename)
 		" バッファがhidden状態の場合は通常バッファを表示しているウィンドウ探す
-		let normal_wins = -1
 		for w in range(1, winnr('$'))
 			if getwinvar(w, '&buftype') ==# ''
 				" 通常バッファを表示しているウィンドウにスイッチ
 				let _ = s:switch_window(w)
 				exe "buffer" . bufnr(s:current_filename) 
 				call cursor(lnum, 1)
-				normal! z.
+				normal! zt
 				break
 			endif
 		endfor
