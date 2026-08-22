@@ -142,8 +142,13 @@ endfunction
 " bg_cmd
 "---------------------------------------------------------------
 function! s:bg_cmd(command)
-	let result = s:run_background_job(a:command)
-	return result[1] == 0 ? result[0]: []
+	if exists('*ch_close_in')
+		let result = s:run_background_job(a:command)
+		return result[1] == 0 ? result[0]: []
+	else
+		let result = systemlist(join(a:command, ' '))
+		return v:shell_error == 0 ? result : []
+	endif
 endfunction
 
 "-------------------------------------------------------
