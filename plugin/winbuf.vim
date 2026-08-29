@@ -23,7 +23,8 @@ nnoremap <silent> <Plug>(wb-toggle-terminal)	:<C-U>call terminal#toggle_terminal
 tnoremap <silent> <Plug>(wb-toggle-terminal)	:<C-U> <C-\><C-n>:call terminal#toggle_terminal()
 nnoremap <silent> <Plug>(wb-toggle-preview)		:<C-U>call quickfix#toggle_preview()
 nnoremap <silent> <Plug>(wb-toggle-quickfix)	:<C-U>call quickfix#toggle_quickfix()
-nnoremap <silent> <Plug>(wb-buffer-close)		:<C-U>call buffer#close()
+nnoremap <silent> <Plug>(wb-buffer-close)		:<C-U>call buffer#close(0)
+nnoremap <silent> <Plug>(wb-buffer-close_all)	:<C-U>call buffer#close(1)
 nnoremap <silent> <Plug>(wb-buffer-list)		:<C-U>call buffer#list()
 
 if exists('g:winbuf_easymotion_enable') && g:winbuf_easymotion_enable

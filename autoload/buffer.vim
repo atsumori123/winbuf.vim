@@ -105,11 +105,14 @@ endfunction
 "---------------------------------------------------
 " close
 "---------------------------------------------------
-function! buffer#close() abort
+function! buffer#close(arg) abort
 	let bt = &buftype
 	let nr = bufnr('%')
 
-	if bt ==# 'quickfix'
+	if bt ==# '' && a:arg == 0
+		return
+
+	elseif bt ==# 'quickfix'
 		" カレントバッファがQuickfixの場合
 		cclose
 		return
