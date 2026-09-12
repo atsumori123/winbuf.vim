@@ -268,8 +268,8 @@ endfunction
 " extract_linenumber
 "-------------------------------------------------------
 function! s:extract_linenumber(tag)
-	let start = strridx(a:tag, "\t" . "line:") + 6
-	return start == -1 ? -1 : matchstr(a:tag, '^.\{' . start . '\}\zs\d\+')
+	let lnum = matchstr(a:tag, '.*\zs\tline:\zs\d\+')
+	return empty(lnum) ? -1 : lnum
 endfunction
 
 "---------------------------------------------------------------
