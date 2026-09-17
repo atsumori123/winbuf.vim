@@ -1,7 +1,7 @@
-if exists('g:loaded_switch')
+if exists('g:loaded_winbuf')
 	finish
 endif
-let g:loaded_switch = 1
+let g:loaded_winbuf = 1
 
 let s:save_cpo = &cpoptions
 set cpoptions&vim

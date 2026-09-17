@@ -41,9 +41,7 @@ function! switch_buffer#switch_buffer(direction) abort
 		if exists('g:stline_buffers')
 			let buflist = g:stline_buffers
 		else
-			" カレントバッファ以外で、ファイルとして存在、または新規ファイルのバッファリストを作成
-			let buflist = map(getbufinfo({'buflisted': 1}), 'v:val.bufnr')
-			call filter(buflist, 'filereadable(bufname(v:val)) || empty(getbufvar(v:val, "&buftype"))')
+			let buflist = winbuf#normal_buffers()
 		endif
 			
 		" 通常バッファが1個の場合はスイッチできるバッファがないため終了する

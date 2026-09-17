@@ -338,7 +338,7 @@ function! s:EasyMotion(char)
 
 	finally
 		" バッファコンフィグの復元
-		call s:set_bufvar()
+		call s:restore_bufvar()
 
 		" 全ハイライトを無効化
 		call s:delete_highlight()

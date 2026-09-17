@@ -8,7 +8,8 @@ let s:cpo_save = &cpo
 set cpo&vim
 
 let s:current_filename = ""
-let s:TagList = []
+let s:TagList = {}
+let s:ctags_jobs = {}
 
 "-------------------------------------------------------
 " get_file_hash
@@ -21,23 +22,22 @@ endfunction
 " is_registered
 "-------------------------------------------------------
 function! s:is_registered(file_hash)
-	return index(s:TagList, a:file_hash) != -1 ? 1 : 0
+	return has_key(s:TagList, a:file_hash)
 endfunction
 
 "-------------------------------------------------------
 " register_taglist
 "-------------------------------------------------------
 function! s:register_taglist(file_hash)
-	call add(s:TagList, a:file_hash)
+	let s:TagList[a:file_hash] = 1
 endfunction
 
 "-------------------------------------------------------
 " unregister_taglist
 "-------------------------------------------------------
 function! s:unregister_taglist(file_hash)
-	let i = index(s:TagList, a:file_hash)
-	if i == -1 | return | endif
-	call remove(s:TagList, i)
+	if !has_key(s:TagList, a:file_hash) | return | endif
+	call remove(s:TagList, a:file_hash)
 	unlet s:{a:file_hash}
 endfunction
 
@@ -45,8 +45,8 @@ endfunction
 " unregister_all_taglist
 "-------------------------------------------------------
 function! s:unregister_all_taglist()
-	for v in s:TagList
-		call s:unregister_taglist(v)
+	for file_hash in keys(copy(s:TagList))
+		call s:unregister_taglist(file_hash)
 	endfor
 endfunction
 
@@ -138,35 +138,83 @@ function! s:is_skip_file(filename, ftype, buftype)
 	return skip
 endfunction
 
-"-------------------------------------------------------
-" run_background_job
-"-------------------------------------------------------
-function! s:run_background_job(cmd) abort
-	let exit = []
-	let lines = []
-	let jopts = {
-		\ 'out_cb': { j, str -> add(lines, str) },
-		\ 'err_cb': { j, str -> add(lines, str) },
-		\ 'exit_cb': { j, code -> add(exit, code) }}
-	let job = job_start(a:cmd, jopts)
-	call ch_close_in(job)
-	while ch_status(job) !~# '^closed$\|^fail$' || job_status(job) ==# 'run'
-		sleep 1m
-	endwhile
+"---------------------------------------------------------------
+" start_ctags_async
+"---------------------------------------------------------------
+function! s:start_ctags_async(filename, ftype, file_hash) abort
+	" taglist対応ファイルか
+	let ctags_args = s:get_ftype_option(a:ftype)
+	if empty(ctags_args)
+		return 0
+	endif
 
-	return [lines, exit[0]]
+	" 既にジョブ実行中の場合はスキップ
+	if has_key(s:ctags_jobs, a:file_hash)
+		return 1
+	endif
+
+	" ctagsコマンドを作る
+	let cmd = ['ctags', '-f', '-', '--excmd=pattern', '--fields=nKs', '--sort=no']
+	call add(cmd, '--language-force=' . matchstr(ctags_args, '--\zs.\{-}\ze-'))
+	call add(cmd, ctags_args)
+	call add(cmd, a:filename)
+
+	" ジョブリストに登録
+	let lines = []
+	let s:ctags_jobs[a:file_hash] = {'filename': a:filename, 'lines': lines}
+
+	if has('nvim')
+		let opts = {
+			\ 'stdout_buffered'	: v:true,
+			\ 'on_stdout'		: { job_id, data, event -> extend(lines, data) },
+			\ 'on_stderr'		: { job_id, data, event -> extend(lines, data) },
+			\ 'on_exit'			: { job_id, code, event -> s:finish_ctags(a:file_hash, code) }}
+		call jobstart(cmd, opts)
+	else
+		let opts = {
+			\ 'out_cb'			: { _, line -> add(lines, line) },
+			\ 'err_cb'			: { _, line -> add(lines, line) },
+			\ 'exit_cb'			: { _, code -> s:finish_ctags(a:file_hash, code) }}
+		let job = job_start(cmd, opts)
+		call ch_close_in(job)
+	endif
+
+	return 1
 endfunction
 
 "---------------------------------------------------------------
-" bg_cmd
+" finish_ctags
 "---------------------------------------------------------------
-function! s:bg_cmd(command)
-	if exists('*ch_close_in')
-		let result = s:run_background_job(a:command)
-		return result[1] == 0 ? result[0]: []
-	else
-		let result = systemlist(join(a:command, ' '))
-		return v:shell_error == 0 ? result : []
+function! s:finish_ctags(file_hash, code) abort
+	" ジョブリストに登録されてない場合は終了
+	if !has_key(s:ctags_jobs, a:file_hash)
+		return
+	endif
+
+	" ジョブが終了したのでジョブリストから外す
+	let job = remove(s:ctags_jobs, a:file_hash)
+	if a:code != 0
+		return
+	endif
+
+	let tags = "s:" . a:file_hash
+	let {tags} = {}
+	for tag in job.lines
+		if empty(tag) | continue | endif
+		let ttype = s:extract_tagtype(tag)
+		let lnum  = s:extract_linenumber(tag)
+		let name  = strpart(tag, 0, stridx(tag, "\t"))
+		if !has_key({tags}, ttype)
+			let {tags}[ttype] = ["[" . lnum . "] " . name]
+		else
+			call add({tags}[ttype], "[" . lnum . "] " . name)
+		endif
+	endfor
+
+	call s:register_taglist(a:file_hash)
+
+	if s:current_filename ==# job.filename && bufwinnr('__Tag_List__') != -1
+		call s:render_taglist(job.filename, a:file_hash)
 	endif
 endfunction
 
@@ -272,49 +320,6 @@ function! s:extract_linenumber(tag)
 	return empty(lnum) ? -1 : lnum
 endfunction
 
-"---------------------------------------------------------------
-" exe_ctags
-"---------------------------------------------------------------
-function! s:exe_ctags(filename, ftype, file_hash)
-	" ファイルタイプ毎のctagsオプションを取得
-	let ctags_args = s:get_ftype_option(a:ftype)
-
-	" 未サポートのファイルタイプの場合は終了
-	if ctags_args == "" | return 0 | endif
-
-	let cmd = ['ctags', '-f', '-', '--excmd=pattern', '--fields=nKs', '--sort=no']
-
-	" ファイルタイプを指定
-	call add(cmd, '--language-force=' . matchstr(ctags_args, '--\zs.\{-}\ze-'))
-
-	" ファイルタイプ固有の引数を指定
-	call add(cmd, ctags_args)
-
-	" 対象ファイルを指定
-	call add(cmd, a:filename)
-
-	" ctags
-	let cmd_output = s:bg_cmd(cmd)
-
-	let tags = "s:" . a:file_hash
-	let {tags} = {}
-	for tag in cmd_output
-		let ttype = s:extract_tagtype(tag)
-		let lnum  = s:extract_linenumber(tag)
-		let name  = strpart(tag, 0, stridx(tag, "\t"))
-		if !has_key({tags}, ttype)
-			let {tags}[ttype] = ["[" . lnum . "] " . name]
-		else
-			call add({tags}[ttype], "[" . lnum . "] " . name)
-		endif
-	endfor
-
-	" 登録
-	call s:register_taglist(a:file_hash)
-
-	return 1
-endfunction
-
 "-------------------------------------------------------
 " close_cleanup
 "-------------------------------------------------------
@@ -407,35 +412,64 @@ function! s:init_window()
 endfunction
 
 "-------------------------------------------------------
+" render_taglist
+"-------------------------------------------------------
+function! s:render_taglist(filename, file_hash) abort
+	" taglistが未オープンの場合は終了
+	let taglist_winnum = bufwinnr('__Tag_List__')
+	if taglist_winnum == -1
+		return
+	endif
+
+	" 元のウィンドウ番号を退避
+	let save_winnum = winnr()
+
+	" taglistのウィンドウにスイッチ
+	let switched_window = save_winnum != taglist_winnum
+	if switched_window
+		call s:switch_window(taglist_winnum)
+	endif
+
+	" 表示形式に変換
+	let output = ['./' . fnamemodify(a:filename, ':t')]
+	for key in keys(s:{a:file_hash})
+		let output += [key] + map(copy(s:{a:file_hash}[key]), '"  " . v:val') + [""]
+	endfor
+
+	try
+		" バッファの内容を消去してから表示
+		setlocal modifiable
+		silent! %delete _
+		call setline(1, output)
+		setlocal nomodifiable
+	finally
+		" 元のウィンドウに戻る
+		if switched_window
+			call s:switch_window(save_winnum)
+		endif
+	endtry
+
+	" taglistのカレントファイルを更新
+	let s:current_filename = a:filename
+endfunction
+
+"-------------------------------------------------------
 " load_taglist
 "-------------------------------------------------------
-function! s:load_taglist(filename, ftype)
+function! s:load_taglist(filename, ftype) abort
 	" ファイルパスをハッシュ値に変換
 	let file_hash = s:get_file_hash(a:filename)
 
 	" キャッシュの有無をチェック
 	if !s:is_registered(file_hash)
-		" キャッシュが無い場合はctagsを実行
-		if s:exe_ctags(a:filename, a:ftype, file_hash) == 0
+		" ctags は UI をブロックしないように非同期で実行する
+		let s:current_filename = a:filename
+		call s:start_ctags_async(a:filename, a:ftype, file_hash)
 			return 0
-		endif
+"		endif
 	endif
 
-	" 表示形式に変換
-	let output = ['./' . fnamemodify(a:filename, ':t')]
-	for key in keys(s:{file_hash})
-		let output += [key] + map(copy(s:{file_hash}[key]), '"  " . v:val') + [""]
-	endfor
-
-	" バッファの内容を消去してから表示
-	setlocal modifiable
-	silent! %delete _
-	call setline(1, output)
-	setlocal nomodifiable
-
-	" taglistのカレントファイルを更新
-	let s:current_filename = a:filename
-
+	call s:render_taglist(a:filename, file_hash)
 	return 1
 endfunction
 
@@ -542,6 +576,7 @@ function! s:highlight_current_tag(filename, cur_lnum, center, autocmd)
 
 	" キー(行番号)が1件も無い場合は終了
 	if empty(sorted_keys)
+		let _ = s:switch_window(save_winnum)
 		return
 	endif
 

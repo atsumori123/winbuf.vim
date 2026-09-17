@@ -110,7 +110,6 @@ function! s:toggle_terminal_popup() abort
 		\ 'maxheight': height,
 		\ 'border': [],
 		\ 'borderhighlight': ['Comment'],
-		\ 'filter': 'TogglePopupTerminalFilter',
 		\ })
 
 	if continue

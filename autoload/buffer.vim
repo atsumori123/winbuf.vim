@@ -52,14 +52,16 @@ endfunction
 " バッファーリスト
 "-------------------------------------------------------
 function! buffer#list() abort
-	" バッファ一覧を取得し、不要な文字をクレンジング
-	let ls = execute('ls')->split("\n")->map({ _, v -> v->substitute('"', '', 'g')->substitute(' 行 .*$', '', '') })
-
-	" メニューリストの作成
-	let list = map(ls, { _, s -> s->split()
-		\ ->{ t -> len(t) != 4 ? insert(t, '', 2) : t }()
-		\ ->{ t -> printf('%4s %s %3s %s   %-16s  (%s)', t[0], stridx(t[1], 'a') >= 0 ? '*' : ' ', t[1], t[2], fnamemodify(t[3], ':t'), t[3]) }()
-		\ })
+	" バッファ情報を構造化データから取得してメニューリストを作成
+	let current_bufnr = bufnr('%')
+	let alternate_bufnr = bufnr('#')
+	let list = []
+	for info in getbufinfo({'buflisted': 1})
+		let filename = empty(info.name) ? '[No Name]' : info.name
+		let is_active = !empty(get(info, 'windows', []))
+		let flags = info.bufnr == current_bufnr ? '%a' : info.bufnr == alternate_bufnr ? '#'.(is_active ? 'a' : 'h') : is_active ? 'a' : 'h'
+		call add(list, printf('%4d %s %3s    %s  (%s)', info.bufnr, is_active ? '*' : ' ', flags, fnamemodify(filename, ':t'), filename))
+	endfor
 
 	" 既にバッファリストを開いている場合はフォーカスだけ移動させて終了
 	let winnum = bufwinnr("-buffers-")
@@ -133,9 +135,9 @@ function! buffer#close(arg) abort
 			endif
 		endif
 
-		" カレントバッファ以外で、ファイルとして存在、または新規ファイルのバッファリストを作成
-		let buflist = map(getbufinfo({'buflisted': 1}), 'v:val.bufnr')
-		call filter(buflist, 'v:val != nr && (filereadable(bufname(v:val)) || empty(getbufvar(v:val, "&buftype")))')
+		" カレントバッファ以外の通常バッファを取得
+		let buflist = winbuf#normal_buffers()
+		call filter(buflist, 'v:val != nr')
 
 		" バッファ削除前に他のバッファに移動しておく。移動できるバッファが無い場合は空バッファを作成する
 		if len(buflist)

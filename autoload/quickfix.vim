@@ -47,13 +47,14 @@ function! quickfix#toggle_preview() abort
 	if empty(s:preview_line) | return | endif
 
 	" プレビューを開く前の全ての通常バッファを記憶
-	let s:normal_buflist= map(getbufinfo({'buflisted': 1}), 'v:val.bufnr')
-	call filter(s:normal_buflist, 'filereadable(bufname(v:val)) || empty(getbufvar(v:val, "&buftype"))')
+	let s:normal_buflist = winbuf#normal_buffers()
 
 	" ファイル履歴に残さずにプレビューウィンドウを水平分割の上側に開く
 	if exists('g:lock_oldfiles') | let g:lock_oldfiles = 1 | endif
 	let w = split(line, '|')
-	execute "leftabove pedit +" . w[1] . ' ' . w[0]
+	let file = w[0]
+	let lnum = split(w[1], ' ')[0]
+	execute "leftabove pedit +" . lnum . ' ' . file
 	if exists('g:lock_oldfiles') | let g:lock_oldfiles = 0 | endif
 endfunction
 
