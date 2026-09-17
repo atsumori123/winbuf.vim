@@ -73,13 +73,15 @@ function! s:switch_window(target_winnum)
 	let old_eventignore = &eventignore
 	set eventignore=all
 
-	let org_winnum = winnr()
-	if org_winnum != a:target_winnum
-		exe a:target_winnum . 'wincmd w'
-	endif
-
-	let &eventignore = old_eventignore
-	return org_winnum
+	try
+		let org_winnum = winnr()
+		if org_winnum != a:target_winnum
+			exe a:target_winnum . 'wincmd w'
+		endif
+		return org_winnum
+	finally
+		let &eventignore = old_eventignore
+	endtry
 endfunction
  
 "-------------------------------------------------------
@@ -501,21 +503,22 @@ function! s:refresh_bufenter(reload)
 	" Disable screen updates
 	let old_lazyredraw = &lazyredraw
 	set nolazyredraw
+	try
+		" TagListウィンドウにジャンプ
+		let save_winnum = s:switch_window(tlist_winnum)
 
-	" TagListウィンドウにジャンプ
-	let save_winnum = s:switch_window(tlist_winnum)
+		" Update the taglist window
+		if s:load_taglist(filename, ftype)
+			" カレントタグをハイライト
+			call s:highlight_current_tag(filename, cur_lnum, 0, 0)
+		endif
 
-	" Update the taglist window
-	if s:load_taglist(filename, ftype)
-		" カレントタグをハイライト
-		call s:highlight_current_tag(filename, cur_lnum, 0, 0)
-	endif
-
-	" Jump back to the original window
-	let _ = s:switch_window(save_winnum)
-
-	" Restore screen updates
-	let &lazyredraw = old_lazyredraw
+		" Jump back to the original window
+		let _ = s:switch_window(save_winnum)
+	finally
+		" Restore screen updates
+		let &lazyredraw = old_lazyredraw
+	endtry
 endfunction
 
 "-------------------------------------------------------

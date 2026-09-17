@@ -296,12 +296,16 @@ function! s:EasyMotion(char)
 
 		" カーソル位置を中心に検索結果をマージする
 		let targets = []
-		while len(targetsF) || len(targetsB)
-			if len(targetsF)
-				call add(targets, remove(targetsF, 0))
+		let indexF  = 0
+		let indexB  = 0
+		while indexF < len(targetsF) || indexB < len(targetsB)
+			if indexF < len(targetsF)
+				call add(targets, targetsF[indexF])
+				let indexF += 1
 			endif
-			if len(targetsB)
-				call add(targets, remove(targetsB, 0))
+			if indexB < len(targetsB)
+				call add(targets, targetsB[indexB])
+				let indexB += 1
 			endif
 		endwhile
 
