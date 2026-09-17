@@ -534,11 +534,16 @@ function! s:highlight_current_tag(filename, cur_lnum, center, autocmd)
 		let lnum_dic[lnum] = i
 	endfor
 
+	" 現在のハイライトをクリア
+	match none
+
 	" キー(行番号)を取り出して昇順にソートする
 	let sorted_keys = sort(keys(lnum_dic), 'N')
 
-	" 現在のハイライトをクリア
-	match none
+	" キー(行番号)が1件も無い場合は終了
+	if empty(sorted_keys)
+		return
+	endif
 
 	" カーソル位置と一番近いタグを探す
 	let lnum = -1
