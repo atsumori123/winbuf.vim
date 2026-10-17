@@ -553,6 +553,10 @@ function! s:highlight_current_tag(filename, cur_lnum, center, autocmd)
 		return
 	endif
 
+	if s:current_filename != a:filename
+		return
+	endif
+
 	" taglistのウィンドウにスイッチ
 	let save_winnum = s:switch_window(winnum)
 
