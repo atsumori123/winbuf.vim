@@ -13,26 +13,5 @@ if !exists('g:winbuf_shell_type')
 	let g:winbuf_shell_type = &shell
 endif
 
-nnoremap <silent> <Plug>(wb-next-buffer)		:<C-U>call switch_buffer#switch_buffer(1)
-nnoremap <silent> <Plug>(wb-prev-buffer)		:<C-U>call switch_buffer#switch_buffer(-1)
-nnoremap <silent> <Plug>(wb-next-window)		:<C-U>call switch_window#switch_window(1)
-nnoremap <silent> <Plug>(wb-prev-window)		:<C-U>call switch_window#switch_window(-1)
-nnoremap <silent> <Plug>(wb-special-window)		:<C-U>call switch_window#switch_special_window()
-nnoremap <silent> <Plug>(wb-resize-window)		:<C-U>call resize_window#resize_window()
-nnoremap <silent> <Plug>(wb-toggle-terminal)	:<C-U>call terminal#toggle_terminal()
-tnoremap <silent> <Plug>(wb-toggle-terminal)	:<C-U> <C-\><C-n>:call terminal#toggle_terminal()
-nnoremap <silent> <Plug>(wb-toggle-preview)		:<C-U>call quickfix#toggle_preview()
-nnoremap <silent> <Plug>(wb-toggle-quickfix)	:<C-U>call quickfix#toggle_quickfix()
-nnoremap <silent> <Plug>(wb-buffer-close)		:<C-U>call buffer#close(0)
-nnoremap <silent> <Plug>(wb-buffer-close_all)	:<C-U>call buffer#close(1)
-nnoremap <silent> <Plug>(wb-buffer-list)		:<C-U>call buffer#list()
-
-if exists('g:winbuf_easymotion_enable') && g:winbuf_easymotion_enable
-	nnoremap <silent> <Plug>(wb-easymotion)			:<C-U>call easymotion#start()
-endif
-if exists('g:winbuf_taglist_enable') && g:winbuf_taglist_enable
-	nnoremap <silent> <Plug>(wb-taglist)			:<C-U>call taglist#open()
-endif
-
 let &cpoptions = s:save_cpo
 unlet s:save_cpo
